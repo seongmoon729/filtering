@@ -1,0 +1,17 @@
+__pycache__/
+
+playground.ipynb
+
+.ipynb_checkpoints
+
+out/
+
+samples/
+
+*.cfg
+
+*.png
+
+*.jpg
+
+*.jpeg

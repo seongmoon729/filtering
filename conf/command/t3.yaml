@@ -1,0 +1,41 @@
+mode: train
+name: filter_vvenc_fm_pre
+
+networks:
+  - vision_network
+  - filtering_network
+  - rate_estimator
+
+filtering_network:
+  architecture:
+    normalization: 'cn'
+    feature_modulation: true
+  train: true
+  optimizer:
+    name: adam
+    learning_rate: 1e-4
+    scheduler: exponential
+    final_lr_ratio: 1e-1
+
+rate_estimator:
+  architecture:
+    normalization: 'cn'
+    feature_modulation: true
+  train: false
+  optimizer:
+    name: adam
+    learning_rate: 1e-4
+    scheduler: exponential
+    final_lr_ratio: 1e-1
+  pretrained: PATH/TO/PRETRAINED/WEIGHT
+
+codec:
+  name: vvenc
+  min_qp: 25
+  max_qp: 50
+
+lmbda:
+  mode: single
+  log2_lmbda: 1
+
+control_input: true

@@ -1,0 +1,46 @@
+vision_task: detection
+vision_model: faster_rcnn_X_101_32x8d_FPN_3x
+seed: 1
+cuda:
+  indices: '2'
+total_step: 50000
+batch_size: 2
+saving_period: 10000
+data_path:
+  base: /filtering/data
+  detectron2: ${data_path.base}
+  openimages: ${data_path.base}/open-images-v6-etri
+  eval_img_dir: ${data_path.openimages}/validation
+  eval_annot_dir: ${data_path.openimages}/annotations_5k
+  coco_class: ${data_path.eval_annot_dir}/coco_classes.txt
+  coco_labelmap: ${data_path.eval_annot_dir}/coco_label_map.pbtxt
+  eval_img_list: ${data_path.eval_annot_dir}/${vision_task}_validation_input_5k.lst
+  eval_annot_boxes: ${data_path.eval_annot_dir}/${vision_task}_validation_bbox_5k.csv
+  eval_annot_labels: ${data_path.eval_annot_dir}/${vision_task}_validation_labels_5k.csv
+  eval_annot_masks: '{data_path.eval_annot_dir}/segmentation_validation_masks_5k.csv'
+  gt_segm_mask_dir: ${data_path.eval_annot_dir}/challenge_2019_validation_masks
+output_dir: ./outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+command:
+  mode: train
+  name: filter_surrogate_fm
+  networks:
+  - vision_network
+  - filtering_network
+  filtering_network:
+    architecture:
+      normalization: cn
+      feature_modulation: true
+    train: true
+    optimizer:
+      name: adam
+      learning_rate: 0.0001
+      scheduler: exponential
+      final_lr_ratio: 0.1
+  codec:
+    name: surrogate
+    quality: 6
+  lmbda:
+    mode: parametrization
+    min_log2_lmbda: -4
+    max_log2_lmbda: 1
+  control_input: true

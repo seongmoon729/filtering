@@ -1,0 +1,27 @@
+mode: train
+name: filter_surrogate_single
+
+networks:
+  - vision_network
+  - filtering_network
+
+filtering_network:
+  architecture:
+    normalization: 'cn'
+    feature_modulation: false
+  train: true
+  optimizer:
+    name: adam
+    learning_rate: 1e-4
+    scheduler: exponential
+    final_lr_ratio: 1e-1
+
+codec:
+  name: surrogate
+  quality: 6
+
+lmbda:
+  mode: single
+  log2_lmbda: 1
+
+control_input: false

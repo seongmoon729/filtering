@@ -1,0 +1,42 @@
+# Written by Seongmoon Jeong - 2022.08.22
+
+version: "3.9"
+
+services:
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ${USER}/filtering:v0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    shm_size: 256gb
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    volumes:
+      - ./:/filtering/
+      - /data1/:/data/  # for symbolic links.
+      - ${HOME}/container_root/:/root/
+    tty: true
+  main:
+    image: ${USER}/filtering:v0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [gpu]
+    shm_size: 256gb
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    volumes:
+      - ./conf/:/filtering/conf/
+      - ./data/:/filtering/data/
+      - ./outputs/:/filtering/outputs/
+      - /data1/:/data/  # for symbolic links.
+      - ${HOME}/container_root/:/root/
+    tty: true
