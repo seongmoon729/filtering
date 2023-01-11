@@ -1,0 +1,34 @@
+name: ???
+
+mode: eval
+
+seed: 1
+
+cuda:
+  indices: [-1]
+
+data_path:
+  base: /filtering/data
+  openimages: "${data_path.base}/open-images-v6-etri"
+  eval_img_dir: "${data_path.openimages}/validation"
+  eval_annot_dir: "${data_path.openimages}/annotations_5k"
+  coco_class: "${data_path.eval_annot_dir}/coco_classes.txt"
+  coco_labelmap: "${data_path.eval_annot_dir}/coco_label_map.pbtxt"
+  eval_img_list: "${data_path.eval_annot_dir}/${setting.vision_network.task}_validation_input_5k.lst"
+  eval_annot_boxes: "${data_path.eval_annot_dir}/${setting.vision_network.task}_validation_bbox_5k.csv"
+  eval_annot_labels: "${data_path.eval_annot_dir}/${setting.vision_network.task}_validation_labels_5k.csv"
+  eval_annot_masks: "${data_path.eval_annot_dir}/segmentation_validation_masks_5k.csv"
+  gt_segm_mask_dir: "${data_path.eval_annot_dir}/challenge_2019_validation_masks"
+
+num_parallel_eval_per_gpu: 6
+
+output_dir: ${hydra:run.dir}
+
+hydra:
+  run:
+    dir: ./outputs/${name}/eval
+
+
+defaults:
+  - _self_
+  - setting: ???

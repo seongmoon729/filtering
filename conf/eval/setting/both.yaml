@@ -1,0 +1,17 @@
+vision_network:
+  task: detection
+  model: faster_rcnn_X_101_32x8d_FPN_3x
+
+filtering_network:
+  step: 30000
+
+rate_estimator:
+  step: 30000
+
+ds_levels: [0]
+
+codec:
+  name: vvenc
+  qualities: [50, 45, 40, 35, 30, 25]
+
+control_input: quality

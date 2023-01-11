@@ -1,0 +1,27 @@
+name: ???
+
+mode: train
+
+seed: 1
+
+cuda:
+  indices: [-1]
+
+total_step: 50000
+batch_size: 2
+
+saving_period: 10000
+
+data_path:
+  base: /filtering/data
+  detectron2: "${data_path.base}"
+  
+output_dir: ${hydra:run.dir}
+
+hydra:
+  run:
+    dir: ./outputs/${name}/train
+
+defaults:
+  - _self_
+  - setting: ???

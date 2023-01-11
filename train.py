@@ -80,7 +80,7 @@ def _dist_train_worker(
 
 
 def _train_for_object_detection(cfg):
-    # Output path
+
     output_path = Path(cfg.output_dir)
 
     # Seed random number generator.
@@ -90,8 +90,16 @@ def _train_for_object_detection(cfg):
     if comm.is_main_process():
         logging.info(f"Output path: {output_path}")
 
-    # Get detectron2 config data.
-    od_cfg = utils.get_od_cfg(cfg.vision_task, cfg.vision_model)
+    # Build data loader.
+    if hasattr(cfg.setting, 'vision_network'):
+        vision_task = cfg.setting.vision_network.task
+        vision_model = cfg.setting.vision_network.model
+    else:  # dummy for dataloader
+        vision_task = 'detection'
+        vision_model = 'faster_rcnn_X_101_32x8d_FPN_3x'
+    _od_cfg = utils.get_od_cfg(vision_task, vision_model)
+    _od_cfg.SOLVER.IMS_PER_BATCH = cfg.batch_size
+    dataloader = build_detection_train_loader(_od_cfg)
 
     # Build end-to-end model.
     end2end_network = models.EndToEndNetwork(cfg)
@@ -102,13 +110,13 @@ def _train_for_object_detection(cfg):
     # Set mode as training.
     end2end_network.train()
 
-    filter_train_flag = 'filtering_network' in cfg.command.networks and cfg.command.filtering_network.train
-    estimator_train_flag = 'rate_estimator' in cfg.command.networks and cfg.command.rate_estimator.train
+    filter_train_flag = hasattr(cfg.setting, 'filtering_network') and cfg.setting.filtering_network.train
+    estimator_train_flag = hasattr(cfg.setting, 'rate_estimator') and cfg.setting.rate_estimator.train
 
     # Build optimizers.
     if filter_train_flag:
-        filtering_cfg = cfg.command.filtering_network
-        filtering_params = end2end_network.filtering_network.parameters()
+        filtering_cfg = cfg.setting.filtering_network
+        filtering_params = list(end2end_network.filtering_network.parameters())
         filtering_optimizer, filtering_optimizer_scheduler = _create_optimizer(
             filtering_params,
             filtering_cfg.optimizer.name,
@@ -120,8 +128,8 @@ def _train_for_object_detection(cfg):
             filtering_ckpt = checkpoint.Checkpoint(output_path / 'filtering_network')
 
     if estimator_train_flag:
-        estimator_cfg = cfg.targets.rate_estimator
-        estimator_params = end2end_network.bitrate_estimator.parameters()
+        estimator_cfg = cfg.setting.rate_estimator
+        estimator_params = list(end2end_network.rate_estimator.parameters())
         estimator_optimizer, estimator_optimizer_scheduler = _create_optimizer(
             estimator_params,
             estimator_cfg.optimizer.name,
@@ -146,30 +154,24 @@ def _train_for_object_detection(cfg):
     if comm.is_main_process():
         writer = SummaryWriter(output_path)
 
-    # Build data loader.
-    od_cfg.SOLVER.IMS_PER_BATCH = cfg.batch_size
-    dataloader = build_detection_train_loader(od_cfg)
-
     # Run training loop.
     logging.info("Start training.")
     end_step = cfg.total_step
 
     for data, step in zip(dataloader, range(1, end_step + 1)):
-        control_input = np.random.rand(cfg.batch_size // comm.get_world_size()) if cfg.command.control_input else None
-
+        control_input = np.random.rand(cfg.batch_size // comm.get_world_size()) if cfg.setting.control_input else None
+        outs = end2end_network(data, control_input=control_input)
         if filter_train_flag:
             filtering_optimizer.zero_grad()
-            outs = end2end_network(data, control_input=control_input)
             loss_rd = outs['loss_r'] + outs['loss_d']
-            loss_rd.backward()
+            loss_rd.backward(retain_graph=estimator_train_flag)
             filtering_optimizer.step()
             filtering_optimizer_scheduler.step()
 
         if estimator_train_flag:
             estimator_optimizer.zero_grad()
-            outs = end2end_network(data, control_input=control_input)
             loss_aux = outs['loss_aux']
-            loss_aux.backward()
+            loss_aux.backward(inputs=estimator_params)
             estimator_optimizer.step()
             estimator_optimizer_scheduler.step()
 

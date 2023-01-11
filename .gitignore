@@ -1,12 +1,10 @@
 __pycache__/
 
-playground.ipynb
+outputs/
+
+*.ipynb
 
 .ipynb_checkpoints
-
-out/
-
-samples/
 
 *.cfg
 

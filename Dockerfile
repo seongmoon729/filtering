@@ -51,7 +51,7 @@ RUN pip install --no-deps .
 
 # Install others.
 RUN python -m pip install \
-    seaborn ray[default]==2.0.0 compressai fiftyone hydra-core==1.2.0
+    seaborn ray[default]==2.0.0 compressai fiftyone hydra-core==1.3.1
 
 # Install FFmpeg
 RUN add-apt-repository ppa:savoury1/ffmpeg4

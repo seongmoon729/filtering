@@ -1,10 +1,6 @@
-mode: train
-name: filter_vvenc_fm_pre
-
-networks:
-  - vision_network
-  - filtering_network
-  - rate_estimator
+vision_network:
+  task: detection
+  model: faster_rcnn_X_101_32x8d_FPN_3x
 
 filtering_network:
   architecture:

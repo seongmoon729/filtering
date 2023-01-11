@@ -22,33 +22,36 @@ class EndToEndNetwork(nn.Module):
         super().__init__()
         self.cfg = cfg
 
-        self.is_filtering = 'filtering_network' in self.cfg.command.networks
-        self.is_vision_task = 'vision_network' in self.cfg.command.networks
-        self.is_estimator = 'rate_estimator' in self.cfg.command.networks
+        self.is_filtering = hasattr(self.cfg.setting, 'filtering_network')
+        self.is_vision = hasattr(self.cfg.setting, 'vision_network')
+        self.is_estimator = hasattr(self.cfg.setting, 'rate_estimator')
 
         # Codec
-        if self.cfg.command.codec.name == 'surrogate':
-            self.codec = ca_zoo.mbt2018(self.cfg.command.codec.quality, pretrained=True)
+        if self.cfg.setting.codec.name == 'surrogate':
+            self.codec = ca_zoo.mbt2018(self.cfg.setting.codec.quality, pretrained=True)
         else:
-            self.codec = StandardCodec(codec=self.cfg.command.codec.name)
+            self.codec = StandardCodec(codec=self.cfg.setting.codec.name)
 
         # Networks
         if self.is_filtering:
-            self.feature_modulation = self.cfg.command.filtering_network.architecture.feature_modulation
+            filtering_cfg = self.cfg.setting.filtering_network
+            self.feature_modulation = filtering_cfg.architecture.feature_modulation
             self.filtering_network = FilteringNetwork(
-                self.cfg.command.filtering_network.architecture.feature_modulation,
-                self.cfg.command.filtering_network.architecture.normalization)
+                filtering_cfg.architecture.feature_modulation,
+                filtering_cfg.architecture.normalization)
 
-        if self.is_vision_task:
-            od_cfg = utils.get_od_cfg(self.cfg.vision_task, self.cfg.vision_model)
+        if self.is_vision:
+            vision_cfg = self.cfg.setting.vision_network
+            od_cfg = utils.get_od_cfg(vision_cfg.task, vision_cfg.model)
             self.vision_network = VisionNetwork(od_cfg)
             self.inference_aug = T.ResizeShortestEdge(
                 [od_cfg.INPUT.MIN_SIZE_TEST, od_cfg.INPUT.MIN_SIZE_TEST], od_cfg.INPUT.MAX_SIZE_TEST)
 
         if self.is_estimator:
+            estimator_cfg = self.cfg.setting.rate_estimator
             self.rate_estimator = BitrateEstimator(
-                self.cfg.command.rate_estimator.architecture.feature_modulation,
-                self.cfg.command.rate_estimator.architecture.normalization)
+                estimator_cfg.architecture.feature_modulation,
+                estimator_cfg.architecture.normalization)
         
 
     def forward(self, inputs, control_input=None, eval_codec=None, eval_quality=None, eval_downscale=None):
@@ -67,21 +70,26 @@ class EndToEndNetwork(nn.Module):
             dict: a dictionary containing losses and outputs
         """
 
-        codec_cfg = self.cfg.command.codec
+        if not self.training:
+            return self.inference(
+                inputs, eval_codec, eval_quality, eval_downscale, control_input=control_input)
+
+
+        codec_cfg = self.cfg.setting.codec
         
-        if self.cfg.command.control_input:
+        if self.cfg.setting.control_input:
             fm_layer_input = control_input * 2.0 - 1.0
             fm_layer_input = torch.as_tensor(fm_layer_input, dtype=torch.float32, device=self.device)
             fm_layer_input = fm_layer_input.reshape(len(fm_layer_input), 1)
 
             # Lambda
-            if hasattr(self.cfg.command, 'lmbda'):
-                if self.cfg.command.lmbda.mode == 'parametrization':
-                    log2_lmbda_range = self.cfg.command.lmbda.max_log2_lmbda - self.cfg.command.lmbda.min_log2_lmbda
-                    log2_lmbdas = control_input * log2_lmbda_range + self.cfg.command.lmbda.min_log2_lmbda
+            if hasattr(self.cfg.setting, 'lmbda'):
+                if self.cfg.setting.lmbda.mode == 'parametrization':
+                    log2_lmbda_range = self.cfg.setting.lmbda.max_log2_lmbda - self.cfg.setting.lmbda.min_log2_lmbda
+                    log2_lmbdas = control_input * log2_lmbda_range + self.cfg.setting.lmbda.min_log2_lmbda
                     lmbdas = 2 ** log2_lmbdas
-                elif self.cfg.command.lmbda.mode == 'single':
-                    lmbdas = 2 ** self.cfg.command.lmbda.log2_lmbda
+                elif self.cfg.setting.lmbda.mode == 'single':
+                    lmbdas = 2 ** self.cfg.setting.lmbda.log2_lmbda
                 else:
                     raise NotImplementedError("Only 'parametrization' and 'single' are supported.")
             
@@ -93,12 +101,8 @@ class EndToEndNetwork(nn.Module):
         else:
             fm_layer_input = None
             # Lambda
-            assert self.cfg.command.lmbda.mode == 'single'
-            lmbdas = 2 ** self.cfg.command.lmbda.log2_lmbda
-            
-        if not self.training:
-            return self.inference(
-                inputs, eval_codec, eval_quality, eval_downscale, fm_layer_input=fm_layer_input)            
+            assert self.cfg.setting.lmbda.mode == 'single'
+            lmbdas = 2 ** self.cfg.setting.lmbda.log2_lmbda        
 
         outs = dict()
 
@@ -110,7 +114,7 @@ class EndToEndNetwork(nn.Module):
         # 1. (optional) Filtering
         if self.is_filtering:
             x_padded, (h, w) = self.filtering_network.preprocess(x)
-            if self.cfg.command.filtering_network.architecture.feature_modulation:
+            if self.cfg.setting.filtering_network.architecture.feature_modulation:
                 x_dot_padded = self.filtering_network(x_padded, fm_layer_input)
             else:
                 x_dot_padded = self.filtering_network(x_padded)
@@ -126,7 +130,7 @@ class EndToEndNetwork(nn.Module):
             bpp_pred = self.compute_bpp_from_likelihoods(surrogate_codec_out)
         else:
             x_hat, bpp = self.codec(x_dot, qps)
-            if self.cfg.command.rate_estimator.architecture.feature_modulation:
+            if self.cfg.setting.rate_estimator.architecture.feature_modulation:
                 bpp_pred = self.rate_estimator(x_hat, fm_layer_input)
             else:
                 bpp_pred = self.rate_estimator(x_hat)
@@ -135,14 +139,14 @@ class EndToEndNetwork(nn.Module):
             outs['loss_aux'] = loss_aux
         outs['bpp_pred'] = torch.mean(bpp_pred)
 
-        if hasattr(self.cfg.command, 'lmbda'):
+        if hasattr(self.cfg.setting, 'lmbda'):
             loss_r = bpp_pred
             lmbdas = torch.as_tensor(lmbdas, dtype=torch.float32, device=loss_r.device)
             loss_r = torch.mean(lmbdas * loss_r)
             outs['loss_r'] = loss_r
 
         # 3. (optional) Vision task
-        if self.is_vision_task:
+        if self.is_vision:
             # Re-order color channel from RGB to BGR & denormalize.
             x_hat_BGR = x_hat[:, [2, 1, 0], :, :] * 255.
             images.tensor = x_hat_BGR
@@ -162,7 +166,7 @@ class EndToEndNetwork(nn.Module):
         return outs
 
 
-    def inference(self, x, codec, quality, downscale, fm_layer_input=None):
+    def inference(self, x, codec, quality, downscale, control_input=None):
         """ Proceed inference on a sinle image (not batched!).
 
         Args:
@@ -197,12 +201,15 @@ class EndToEndNetwork(nn.Module):
             # Convert to torch tensor.
             x = torch.as_tensor(x, device=self.device)
 
+            if control_input:
+                fm_layer_input = control_input * 2.0 - 1.0
+                fm_layer_input = torch.as_tensor(fm_layer_input, dtype=torch.float32, device=self.device)
+                fm_layer_input = fm_layer_input.reshape((1, 1))
+
             # 1. (optional) Filtering
             if self.is_filtering:
                 x_padded, (h, w) = self.filtering_network.preprocess(x)
-                if fm_layer_input:
-                    fm_layer_input = torch.as_tensor(fm_layer_input, dtype=torch.float32, device=x_padded.device)
-                    fm_layer_input = fm_layer_input.reshape((1, 1))
+                if self.cfg.setting.filtering_network.architecture.feature_modulation:
                     x_dot_padded = self.filtering_network(x_padded[None, ...], fm_layer_input)[0]
                 else:
                     x_dot_padded = self.filtering_network(x_padded[None, ...])[0]
@@ -236,18 +243,18 @@ class EndToEndNetwork(nn.Module):
                 if self.is_estimator:
                     x_hat = torch.as_tensor(x_hat_numpy, dtype=torch.float32, device=self.device)
                     x_hat = x_hat[None, ...]
-                    if self.cfg.command.rate_estimator.architecture.feature_modulation:
+                    if self.cfg.setting.rate_estimator.architecture.feature_modulation:
                         bpp_pred = self.rate_estimator(x_hat, fm_layer_input)[0]
                     else:
                         bpp_pred = self.rate_estimator(x_hat)[0]
                     bpp_mse = torch.mean((bpp_pred - bpp))
-                    outs['bpp_pred'] = bpp_pred
-                    outs['bpp_mse'] = bpp_mse
+                    outs['bpp_pred'] = bpp_pred.item()
+                    outs['bpp_mse'] = bpp_mse.item()
                 outs['bpp'] = bpp
                     
 
             # 3. (optional) Vision task
-            if self.is_vision_task:
+            if self.is_vision:
                 # Change reconstructed image format to (H, W, C) & denormalize.
                 od_input_image = x_hat_numpy.transpose(1, 2, 0) * 255.
 
@@ -287,7 +294,11 @@ class EndToEndNetwork(nn.Module):
         images = [x[[2, 1, 0], :, :] for x in images]
 
         images = [x.to(self.device) for x in images]
-        images = ImageList.from_tensors(images, self.vision_network.size_divisibility)
+
+        if self.is_vision:
+            images = ImageList.from_tensors(images, self.vision_network.size_divisibility)
+        else:
+            images = ImageList.from_tensors(images, 64)
         return images
 
     def compute_bpp_from_likelihoods(self, out):
@@ -298,7 +309,7 @@ class EndToEndNetwork(nn.Module):
 
     @property
     def device(self):
-        return self.vision_network.device
+        return next(self.parameters()).device
 
 
 class VisionNetwork(nn.Module):
@@ -556,7 +567,7 @@ class BitrateEstimator(nn.Module):
         self.normalization = normalization
 
         conv_channel_config = [
-            (1, 32), (32, 64), (64, 128)
+            (3, 32), (32, 64), (64, 128)
         ]
         self.conv_blocks = nn.ModuleList([
             FMConv2dBlock(i, o, (3, 3), 2) for i, o in conv_channel_config
@@ -587,6 +598,10 @@ class BitrateEstimator(nn.Module):
         out = self.last_conv(out)
         out = torch.mean(out, dim=(1, 2, 3)) * 24.0
         return out
+
+    @property
+    def device(self):
+        return next(self.parameters()).device
 
 
 class StandardCodec(nn.Module):
