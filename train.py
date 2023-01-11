@@ -28,6 +28,7 @@ _DEFAULT_TIMEOUT = timedelta(minutes=30)
 
 def train(cfg):
     n_gpu = len(cfg.cuda.indices)
+    cfg.output_dir = cfg.output_dir
 
     if n_gpu > 1:
         mp.spawn(
