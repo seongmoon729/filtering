@@ -129,7 +129,7 @@ class EndToEndNetwork(nn.Module):
             x_hat = self.filtering_network.postprocess(x_hat_padded, (h, w))
             bpp_pred = self.compute_bpp_from_likelihoods(surrogate_codec_out)
         else:
-            x_hat, bpp = self.codec(x_dot, qps)
+            x_hat, bpp = self.codec(x_dot, qps, self.cfg.setting.codec.ds)
             if self.cfg.setting.rate_estimator.architecture.feature_modulation:
                 bpp_pred = self.rate_estimator(x_hat, fm_layer_input)
             else:
@@ -610,11 +610,11 @@ class StandardCodec(nn.Module):
         self.connect_gradient = GradientConnector.apply
         self.codec = codec
     
-    def forward(self, x, qp):
+    def forward(self, x, qp, ds):
         device = x.device
         x_numpy = x.detach().cpu().numpy()
         n = len(x_numpy)
-        x_hat, bpp = zip(*ray.get([codec_ops.ray_codec_fn.remote(x_numpy[i], self.codec, qp[i]) for i in range(n)]))
+        x_hat, bpp = zip(*ray.get([codec_ops.ray_codec_fn.remote(x_numpy[i], self.codec, qp[i], ds) for i in range(n)]))
         x_hat = np.stack(x_hat, axis=0)
         bpp = np.stack(bpp, axis=0)
         x_hat = torch.as_tensor(x_hat, dtype=torch.float32, device=device)

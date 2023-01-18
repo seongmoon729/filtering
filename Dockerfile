@@ -91,6 +91,9 @@ RUN rm /create_vvenc_cfg.py
 # Due to torch tensorboard issue.
 RUN pip install setuptools==59.5.0
 
+# Install code-server.
+RUN curl -fsSL https://code-server.dev/install.sh | sh
+
 # Set working directory.
 WORKDIR /filtering
 

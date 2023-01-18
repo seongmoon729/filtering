@@ -14,5 +14,6 @@ codec:
   name: vvenc
   min_qp: 25
   max_qp: 50
+  ds: 0
   
 control_input: true

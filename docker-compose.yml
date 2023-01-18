@@ -19,9 +19,12 @@ services:
       stack: 67108864
     volumes:
       - ./:/filtering/
-      - /data1/:/data/  # for symbolic links.
+      - /data4/:/data/  # for symbolic links.
       - ${HOME}/container_root/:/root/
     tty: true
+    ports:
+      - "127.0.0.1:8041:8041"
+    entrypoint: code-server
   main:
     image: ${USER}/filtering:v0
     deploy:
@@ -37,6 +40,6 @@ services:
       - ./conf/:/filtering/conf/
       - ./data/:/filtering/data/
       - ./outputs/:/filtering/outputs/
-      - /data1/:/data/  # for symbolic links.
+      - /data4/:/data/  # for symbolic links.
       - ${HOME}/container_root/:/root/
     tty: true
