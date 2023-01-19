@@ -5,7 +5,7 @@ vision_network:
 filtering_network:
   architecture:
     normalization: 'cn'
-    feature_modulation: true
+    feature_modulation: false
   train: true
   optimizer:
     name: adam
@@ -30,10 +30,10 @@ codec:
   name: vvenc
   min_qp: 25
   max_qp: 50
-  ds: 4
+  ds: 3
 
 lmbda:
   mode: single
   log2_lmbda: 1
 
-control_input: true
+control_input: 1.0
