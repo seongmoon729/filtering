@@ -630,7 +630,7 @@ class GradientConnector(torch.autograd.Function):
     
     @staticmethod
     def backward(_, grad_out1, grad_out2):
-        return grad_out1, grad_out1
+        return grad_out2, grad_out2
 
 
 def build_object_detection_model(cfg):
