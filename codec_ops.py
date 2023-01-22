@@ -6,7 +6,6 @@ from subprocess import Popen, PIPE
 from pathlib import Path
 from PIL import Image
 
-import ray
 import numpy as np
 
 
@@ -22,11 +21,6 @@ JPEG_QUALITIES  = [31, 11, 5, 2]
 WEBP_QUALITIES  = [1, 18, 53, 83, 95]
 VTM_QUALITIES   = [47, 42, 37, 32, 27, 22]
 VVENC_QUALITIES = [50, 45, 40, 35, 30, 25]
-
-
-@ray.remote
-def ray_codec_fn(x, codec, quality, downscale=0):
-    return codec_fn(x, codec, quality, downscale)
     
 
 def codec_fn(x, codec, quality, downscale=0):
