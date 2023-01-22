@@ -30,7 +30,7 @@ codec:
   name: vvenc
   min_qp: 25
   max_qp: 50
-  ds: 4
+  ds: 3
 
 lmbda:
   mode: single
