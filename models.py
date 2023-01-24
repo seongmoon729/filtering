@@ -203,7 +203,7 @@ class EndToEndNetwork(nn.Module):
             # Convert to torch tensor.
             x = torch.as_tensor(x, device=self.device)
 
-            if control_input:
+            if control_input is not None:
                 fm_layer_input = control_input * 2.0 - 1.0
                 fm_layer_input = torch.as_tensor(fm_layer_input, dtype=torch.float32, device=self.device)
                 fm_layer_input = fm_layer_input.reshape((1, 1))
