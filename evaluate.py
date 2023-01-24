@@ -131,7 +131,8 @@ def evaluate(eval_cfg):
         subset_df = subset_df[subset_df.task == eval_cfg.setting.vision_network.task]
         subset_df = subset_df[subset_df.model == eval_cfg.setting.vision_network.model]
         subset_df = subset_df[subset_df.codec == eval_cfg.setting.codec.name]
-        subset_df = subset_df[subset_df.step == eval_cfg.setting.step]
+        subset_df = subset_df[subset_df.filtering_step == eval_cfg.setting.filtering_network.step]
+        subset_df = subset_df[subset_df.estimator_step == eval_cfg.setting.rate_estimator.step]
         evaluated_settings = itertools.product(subset_df.downscale, subset_df.quality)
         for _setting in evaluated_settings:
             if _setting in eval_settings:
