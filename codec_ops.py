@@ -57,8 +57,6 @@ def run_codec(input, codec, q, ds=0):
     # Make temp directory for processing.
     dst_dir_obj = tempfile.TemporaryDirectory()
     dst_dir = Path(dst_dir_obj.name)
-    # dst_dir = Path('/surrogate_v2/codec_test/')
-    # dst_dir.mkdir(parents=True, exist_ok=True)
 
     # Save input image in temp directory for cmd processing.
     src_img_path = dst_dir / 'raw.png'
