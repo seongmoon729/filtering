@@ -16,21 +16,16 @@ filtering_network:
 rate_estimator:
   architecture:
     normalization: 'cn'
-    feature_modulation: true
+    feature_modulation: false
   train: false
-  optimizer:
-    name: adam
-    learning_rate: 1e-4
-    scheduler: exponential
-    final_lr_ratio: 1e-1
-  pretrained: /filtering/outputs/estimator_ds3
-  pretrained_step: 40000
+  pretrained: ???
+  pretrained_step: 50000
 
 codec:
   name: vvenc
   min_qp: 25
   max_qp: 50
-  ds: 3
+  ds: 0
 
 lmbda:
   mode: single
