@@ -1,6 +1,6 @@
 import os
 from itertools import repeat
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 import torch
@@ -608,14 +608,16 @@ class StandardCodec(nn.Module):
         super().__init__()
         self.connect_gradient = GradientConnector.apply
         self.codec = codec
+
+        max_workers = min(batch_size, os.cpu_count()) if batch_size else os.cpu_count()
+        self._executor = ProcessPoolExecutor(max_workers=max_workers)
     
     def forward(self, x, qp, ds):
         device = x.device
         x_numpy = x.detach().cpu().numpy()
-        with ThreadPoolExecutor(max_workers=min(len(x_numpy), os.cpu_count())) as executor:
-            x_hat, bpp = zip(*executor.map(
-                codec_ops.codec_fn,
-                x_numpy, repeat(self.codec), qp, repeat(ds)))
+        x_hat, bpp = zip(*self._executor.map(
+            codec_ops.codec_fn,
+            x_numpy, repeat(self.codec), qp, repeat(ds)))
         x_hat = np.stack(x_hat, axis=0)
         bpp = np.stack(bpp, axis=0)
         x_hat = torch.as_tensor(x_hat, dtype=torch.float32, device=device)
