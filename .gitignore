@@ -13,3 +13,7 @@ outputs/
 *.jpg
 
 *.jpeg
+
+*.html
+
+*.csv

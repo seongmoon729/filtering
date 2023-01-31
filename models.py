@@ -1,6 +1,8 @@
-import ray
-import numpy as np
+import os
+from itertools import repeat
+from concurrent.futures import ProcessPoolExecutor
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -77,7 +79,7 @@ class EndToEndNetwork(nn.Module):
 
         codec_cfg = self.cfg.setting.codec
         
-        if self.cfg.setting.control_input:
+        if self.cfg.setting.control_input != 'none':
             fm_layer_input = control_input * 2.0 - 1.0
             fm_layer_input = torch.as_tensor(fm_layer_input, dtype=torch.float32, device=self.device)
             fm_layer_input = fm_layer_input.reshape(len(fm_layer_input), 1)
@@ -201,7 +203,7 @@ class EndToEndNetwork(nn.Module):
             # Convert to torch tensor.
             x = torch.as_tensor(x, device=self.device)
 
-            if control_input:
+            if control_input is not None:
                 fm_layer_input = control_input * 2.0 - 1.0
                 fm_layer_input = torch.as_tensor(fm_layer_input, dtype=torch.float32, device=self.device)
                 fm_layer_input = fm_layer_input.reshape((1, 1))
@@ -235,11 +237,8 @@ class EndToEndNetwork(nn.Module):
                 x_hat_numpy = x_hat.detach().cpu().numpy()
             else:
                 # (c). Standard codec.
-                x_hat_numpy, bpp = ray.get(codec_ops.ray_codec_fn.remote(
-                    x_dot_numpy,
-                    codec=codec,
-                    quality=quality,
-                    downscale=downscale))
+                x_hat_numpy, bpp = codec_ops.codec_fn(
+                    x_dot_numpy, codec=codec, quality=quality, downscale=downscale)
                 if self.is_estimator:
                     x_hat = torch.as_tensor(x_hat_numpy, dtype=torch.float32, device=self.device)
                     x_hat = x_hat[None, ...]
@@ -605,16 +604,20 @@ class BitrateEstimator(nn.Module):
 
 
 class StandardCodec(nn.Module):
-    def __init__(self, codec='vvenc'):
+    def __init__(self, codec='vvenc', batch_size=None):
         super().__init__()
         self.connect_gradient = GradientConnector.apply
         self.codec = codec
+
+        max_workers = min(batch_size, os.cpu_count()) if batch_size else os.cpu_count()
+        self._executor = ProcessPoolExecutor(max_workers=max_workers)
     
     def forward(self, x, qp, ds):
         device = x.device
         x_numpy = x.detach().cpu().numpy()
-        n = len(x_numpy)
-        x_hat, bpp = zip(*ray.get([codec_ops.ray_codec_fn.remote(x_numpy[i], self.codec, qp[i], ds) for i in range(n)]))
+        x_hat, bpp = zip(*self._executor.map(
+            codec_ops.codec_fn,
+            x_numpy, repeat(self.codec), qp, repeat(ds)))
         x_hat = np.stack(x_hat, axis=0)
         bpp = np.stack(bpp, axis=0)
         x_hat = torch.as_tensor(x_hat, dtype=torch.float32, device=device)
@@ -630,7 +633,7 @@ class GradientConnector(torch.autograd.Function):
     
     @staticmethod
     def backward(_, grad_out1, grad_out2):
-        return grad_out1, grad_out1
+        return grad_out2, grad_out2
 
 
 def build_object_detection_model(cfg):

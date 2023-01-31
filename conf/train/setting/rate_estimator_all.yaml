@@ -1,8 +1,4 @@
-vision_network:
-  task: detection
-  model: faster_rcnn_X_101_32x8d_FPN_3x
-
-filtering_network:
+rate_estimator:
   architecture:
     normalization: 'cn'
     feature_modulation: false
@@ -12,13 +8,12 @@ filtering_network:
     learning_rate: 1e-4
     scheduler: exponential
     final_lr_ratio: 1e-1
+  pretrained: false
 
 codec:
-  name: surrogate
-  quality: 6
-
-lmbda:
-  mode: single
-  log2_lmbda: 1
-
-control_input: none
+  name: vvenc
+  min_qp: 25
+  max_qp: 50
+  ds: 0
+  
+control_input: true

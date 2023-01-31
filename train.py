@@ -113,6 +113,7 @@ def _train_for_object_detection(cfg):
 
     filter_train_flag = hasattr(cfg.setting, 'filtering_network') and cfg.setting.filtering_network.train
     estimator_train_flag = hasattr(cfg.setting, 'rate_estimator') and cfg.setting.rate_estimator.train
+    estimator_restore_flag = hasattr(cfg.setting, 'rate_estimator') and cfg.setting.rate_estimator.pretrained
 
     # Build optimizers.
     if filter_train_flag:
@@ -141,6 +142,11 @@ def _train_for_object_detection(cfg):
         if comm.is_main_process():
             estimator_ckpt = checkpoint.Checkpoint(output_path / 'rate_estimator')
 
+    if estimator_restore_flag:
+        _ckpt_path = Path(cfg.setting.rate_estimator.pretrained)
+        _ckpt = checkpoint.Checkpoint(_ckpt_path / 'train' / 'rate_estimator')
+        _ckpt.load(end2end_network.rate_estimator, cfg.setting.rate_estimator.pretrained_step)
+
     # Distributed.
     distributed = comm.get_world_size() > 1
     if distributed:
@@ -160,8 +166,19 @@ def _train_for_object_detection(cfg):
     end_step = cfg.total_step
 
     for data, step in zip(dataloader, range(1, end_step + 1)):
-        control_input = np.random.rand(cfg.batch_size // comm.get_world_size()) if cfg.setting.control_input else None
+
+        # Prepare control input.
+        if cfg.setting.control_input == 'none':
+            control_input = None
+        elif cfg.setting.control_input == 'random':
+            control_input = np.random.rand(cfg.batch_size // comm.get_world_size())
+        else:
+            control_input = np.ones((cfg.batch_size,)) * cfg.setting.control_input
+
+        # Forward pass.
         outs = end2end_network(data, control_input=control_input)
+
+        # Backpropagation.
         if filter_train_flag:
             filtering_optimizer.zero_grad()
             loss_rd = outs['loss_r'] + outs['loss_d']
