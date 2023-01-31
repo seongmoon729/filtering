@@ -157,14 +157,17 @@ def evaluate(eval_cfg):
     total = len(input_files) * len(eval_settings)
     with tqdm(total=total, dynamic_ncols=True, smoothing=0.1) as pbar:
         for ds, q in eval_settings:
-
-            if eval_cfg.setting.control_input == 'quality':
-                min_q = min(eval_cfg.setting.codec.qualities)
-                max_q = max(eval_cfg.setting.codec.qualities)
-                control_input = 1.0 * (q - min_q) / (max_q - min_q)
+            
+            if hasattr(eval_cfg.setting, 'control_input'):
+                if eval_cfg.setting.control_input == 'quality':
+                    min_q = min(eval_cfg.setting.codec.qualities)
+                    max_q = max(eval_cfg.setting.codec.qualities)
+                    control_input = 1.0 * (q - min_q) / (max_q - min_q)
+                else:
+                    control_input = eval_cfg.setting.control_input
+                    assert control_input > 0. and control_input < 1.
             else:
-                control_input = eval_cfg.setting.control_input
-                assert control_input > 0. and control_input < 1.
+                control_input = None
 
             # Make/set evaluators and their inputs.
             evaluators = [eval_builder.remote(eval_cfg) for _ in range(n_eval)]
@@ -288,7 +291,7 @@ def evaluate(eval_cfg):
                 'downscale'      : ds,
                 'codec'          : eval_cfg.setting.codec.name,
                 'quality'        : q,
-                'filtering_step' : eval_cfg.setting.filtering_network.step if is_vision else None,
+                'filtering_step' : eval_cfg.setting.filtering_network.step if is_vision and hasattr(eval_cfg.setting, 'filtering_network') else None,
                 'estimator_step' : eval_cfg.setting.rate_estimator.step if is_estimator else None,
                 'rate[bpp]'      : sum(bpps_df['bpp']) / len(bpps_df['bpp']),
                 'rate_pred[bpp]' : sum(bpps_df['bpp_pred']) / len(bpps_df['bpp_pred']) if is_estimator else None,
