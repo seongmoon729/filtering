@@ -1,0 +1,19 @@
+rate_estimator:
+  architecture:
+    normalization: 'cn'
+    feature_modulation: false
+  train: true
+  optimizer:
+    name: adam
+    learning_rate: 1e-4
+    scheduler: exponential
+    final_lr_ratio: 1e-1
+  pretrained: false
+
+codec:
+  name: vvenc
+  min_qp: 25
+  max_qp: 25
+  ds: 0
+  
+control_input: random
