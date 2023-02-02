@@ -581,7 +581,7 @@ class BitrateEstimator(nn.Module):
                 nn.AdaptiveAvgPool2d(1),
             )
         elif self.version == 1:
-            self.last_layer = nn.Sequential((
+            self.last_layer = nn.Sequential(
                 nn.Conv2d(128, 256, (3, 3), 2),
                 nn.ReLU(inplace=True),
 
@@ -593,7 +593,7 @@ class BitrateEstimator(nn.Module):
                 nn.Linear(256, 128),
                 nn.ReLU(inplace=True),
                 nn.Linear(256, 1),
-            ))
+            )
         else:
             raise NotImplementedError('Currently only the version 0 and 1 are supported.')
 
