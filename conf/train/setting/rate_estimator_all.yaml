@@ -16,4 +16,4 @@ codec:
   max_qp: 50
   ds: 0
   
-control_input: true
+control_input: random

@@ -36,4 +36,4 @@ lmbda:
   mode: single
   log2_lmbda: 1
 
-control_input: true
+control_input: random
