@@ -53,7 +53,8 @@ class EndToEndNetwork(nn.Module):
             estimator_cfg = self.cfg.setting.rate_estimator
             self.rate_estimator = BitrateEstimator(
                 estimator_cfg.architecture.feature_modulation,
-                estimator_cfg.architecture.normalization)
+                estimator_cfg.architecture.normalization,
+                version=estimator_cfg.architecture.version)
         
 
     def forward(self, inputs, control_input=None, eval_codec=None, eval_quality=None, eval_downscale=None):
@@ -560,10 +561,11 @@ class FMConv2dBlock(nn.Module):
 
 class BitrateEstimator(nn.Module):
     """ Bitrate estimator module that predicts bit-per-pixel from the reconstructed image. """
-    def __init__(self, feature_modulation=False, normalization='cn'):
+    def __init__(self, feature_modulation=False, normalization='cn', version=0):
         super().__init__()
         self.feature_modulation = feature_modulation
         self.normalization = normalization
+        self.version = version
 
         conv_channel_config = [
             (3, 32), (32, 64), (64, 128)
@@ -571,11 +573,29 @@ class BitrateEstimator(nn.Module):
         self.conv_blocks = nn.ModuleList([
             FMConv2dBlock(i, o, (3, 3), 2) for i, o in conv_channel_config
         ])
-        self.last_conv = nn.Sequential(
-            nn.Conv2d(128, 256, (3, 3), 2),
-            nn.Sigmoid(),
-            nn.AdaptiveAvgPool2d(1),
-        )
+
+        if self.version == 0:
+            self.last_layer = nn.Sequential(
+                nn.Conv2d(128, 256, (3, 3), 2),
+                nn.Sigmoid(),
+                nn.AdaptiveAvgPool2d(1),
+            )
+        elif self.version == 1:
+            self.last_layer = nn.Sequential((
+                nn.Conv2d(128, 256, (3, 3), 2),
+                nn.ReLU(inplace=True),
+
+                nn.AdaptiveAvgPool2d(1),
+                nn.Flatten(),
+
+                nn.Linear(256, 256),
+                nn.ReLU(inplace=True),
+                nn.Linear(256, 128),
+                nn.ReLU(inplace=True),
+                nn.Linear(256, 1),
+            ))
+        else:
+            raise NotImplementedError('Currently only the version 0 and 1 are supported.')
 
         if self.feature_modulation:
             fc_channel_config = [
@@ -594,8 +614,14 @@ class BitrateEstimator(nn.Module):
         else:
             for cb in self.conv_blocks:
                 out = cb(out)
-        out = self.last_conv(out)
-        out = torch.mean(out, dim=(1, 2, 3)) * 24.0
+        out = self.last_layer(out)
+
+        if self.version == 0:
+            out = torch.mean(out, dim=(1, 2, 3)) * 24.0
+        elif self.version == 1:
+            pass
+        else:
+            raise NotImplementedError('Currently only the version 0 and 1 are supported.')
         return out
 
     @property

@@ -2,6 +2,7 @@ rate_estimator:
   architecture:
     normalization: 'cn'
     feature_modulation: false
+    version: 0
   train: true
   optimizer:
     name: adam
