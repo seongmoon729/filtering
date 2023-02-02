@@ -592,7 +592,7 @@ class BitrateEstimator(nn.Module):
                 nn.ReLU(inplace=True),
                 nn.Linear(256, 128),
                 nn.ReLU(inplace=True),
-                nn.Linear(256, 1),
+                nn.Linear(128, 1),
             )
         else:
             raise NotImplementedError('Currently only the version 0 and 1 are supported.')
