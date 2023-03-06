@@ -23,7 +23,7 @@ VTM_QUALITIES   = [47, 42, 37, 32, 27, 22]
 VVENC_QUALITIES = [50, 45, 40, 35, 30, 25]
     
 
-def codec_fn(x, codec, quality, downscale=0):
+def codec_fn(x, codec, quality, downscale=0, uv_zero=False):
     """ Encode & decode input with codec. 
         Args:
             x: 'np.ndarray' with range of [0, 1] and order of (C, H, W).
@@ -39,7 +39,7 @@ def codec_fn(x, codec, quality, downscale=0):
     x = x.round().astype('uint8')
     pil_img = Image.fromarray(x)
     
-    pil_img_recon, bpp = run_codec(pil_img, codec, quality, downscale)
+    pil_img_recon, bpp = run_codec(pil_img, codec, quality, downscale, uv_zero)
     pil_img.close()
 
     x = np.array(pil_img_recon)
@@ -51,7 +51,7 @@ def codec_fn(x, codec, quality, downscale=0):
     return x, bpp
 
 
-def run_codec(input, codec, q, ds=0):
+def run_codec(input, codec, q, ds=0, uv_zero=False):
     assert ds in DS_LEVELS, f"Choose one of {DS_LEVELS}."
 
     # Make temp directory for processing.
@@ -84,8 +84,14 @@ def run_codec(input, codec, q, ds=0):
 
     # 1. Downscaling/Padding.
     _run_ffmpeg_down_scaling(src_img_path, tmp_png_path, dw, dh, ds)
+
     # 2. Image to YUV.
     _run_ffmpeg_img2yuv(tmp_png_path, tmp_yuv_path)
+
+    # optional
+    if uv_zero:
+        _make_uv_zero(tmp_yuv_path, dw, dh)
+
     # 3. Codec.
     if codec == 'jpeg':
         _run_ffmpeg_jpeg(tmp_yuv_path, bin_path, recon_yuv_path, dw, dh, q)
@@ -132,6 +138,18 @@ def _run_ffmpeg_img2yuv(src_path, dst_path):
     out_opts = "-f rawvideo -pix_fmt yuv420p -dst_range 1"
     cmd = f"{FFMPEG_BASE_CMD} -i {src_path} {out_opts} {dst_path}"
     _run_cmd(cmd)
+
+
+def _make_uv_zero(src_path, width, height):
+    yuv = np.fromfile(src_path, dtype=np.uint8)
+    yuv = yuv.reshape((int(height*1.5), width))  # YUV420 format
+
+    # Set U and V components to zero
+    yuv[int(height):int(height*1.25), :] = 128  # Set U component to 128
+    yuv[int(height*1.25):, :] = 128  # Set V component to 128
+
+    # Save modified YUV file
+    yuv.tofile(src_path)
 
 
 def _run_ffmpeg_yuv2img(src_path, dst_path, width, height):
