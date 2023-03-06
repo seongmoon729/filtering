@@ -173,7 +173,7 @@ def _train_for_object_detection(cfg):
         elif cfg.setting.control_input == 'random':
             control_input = np.random.rand(cfg.batch_size // comm.get_world_size())
         else:
-            control_input = np.ones((cfg.batch_size,)) * cfg.setting.control_input
+            control_input = np.ones((cfg.batch_size // comm.get_world_size(),)) * cfg.setting.control_input
 
         # Forward pass.
         outs = end2end_network(data, control_input=control_input)
