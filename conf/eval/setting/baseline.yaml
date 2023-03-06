@@ -7,3 +7,4 @@ ds_levels: [0]
 codec:
   name: vvenc
   qualities: [50, 45, 40, 35, 30, 25]
+  uv_zero: false

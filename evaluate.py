@@ -57,7 +57,7 @@ class Evaluator:
             self.coco_classes = open(eval_cfg.data_path.coco_class, 'r').read().splitlines()
             self._is_segmentation = (eval_cfg.setting.vision_network.task == 'segmentation')
     
-    def step(self, input_file, codec, quality, downscale, control_input=None):
+    def step(self, input_file, codec, quality, downscale, control_input=None, uv_zero=False):
         image = cv2.imread(str(input_file))
 
         out = self.end2end_network(
@@ -65,7 +65,8 @@ class Evaluator:
             control_input=control_input,
             eval_codec=codec,
             eval_quality=quality,
-            eval_downscale=downscale)
+            eval_downscale=downscale,
+            uv_zero=uv_zero)
         
         bpps = {k: v for k, v in out.items() if 'bpp' in k}
 
@@ -131,8 +132,10 @@ def evaluate(eval_cfg):
         subset_df = subset_df[subset_df.task == eval_cfg.setting.vision_network.task]
         subset_df = subset_df[subset_df.model == eval_cfg.setting.vision_network.model]
         subset_df = subset_df[subset_df.codec == eval_cfg.setting.codec.name]
-        subset_df = subset_df[subset_df.filtering_step == eval_cfg.setting.filtering_network.step]
-        subset_df = subset_df[subset_df.estimator_step == eval_cfg.setting.rate_estimator.step]
+        if hasattr(eval_cfg.setting, 'filtering_network'):
+            subset_df = subset_df[subset_df.filtering_step == eval_cfg.setting.filtering_network.step]
+        if hasattr(eval_cfg.setting, 'rate_estimator'):
+            subset_df = subset_df[subset_df.estimator_step == eval_cfg.setting.rate_estimator.step]
         evaluated_settings = itertools.product(subset_df.downscale, subset_df.quality)
         for _setting in evaluated_settings:
             if _setting in eval_settings:
@@ -179,6 +182,7 @@ def evaluate(eval_cfg):
                 'quality': q,
                 'downscale': ds,
                 'control_input': control_input,
+                'uv_zero': eval_cfg.setting.codec.uv_zero,
             }
 
             # Run evaluators.

@@ -57,7 +57,7 @@ class EndToEndNetwork(nn.Module):
                 version=estimator_cfg.architecture.version)
         
 
-    def forward(self, inputs, control_input=None, eval_codec=None, eval_quality=None, eval_downscale=None):
+    def forward(self, inputs, control_input=None, eval_codec=None, eval_quality=None, eval_downscale=None, uv_zero=False):
         """ Forward method.
             x --|filtering|--> x_dot --|codec|--> x_hat --|vision_network|--> results(score, bitrate)
 
@@ -75,7 +75,7 @@ class EndToEndNetwork(nn.Module):
 
         if not self.training:
             return self.inference(
-                inputs, eval_codec, eval_quality, eval_downscale, control_input=control_input)
+                inputs, eval_codec, eval_quality, eval_downscale, control_input=control_input, uv_zero=uv_zero)
 
 
         codec_cfg = self.cfg.setting.codec
@@ -169,7 +169,7 @@ class EndToEndNetwork(nn.Module):
         return outs
 
 
-    def inference(self, x, codec, quality, downscale, control_input=None):
+    def inference(self, x, codec, quality, downscale, control_input=None, uv_zero=False):
         """ Proceed inference on a sinle image (not batched!).
 
         Args:
@@ -239,7 +239,7 @@ class EndToEndNetwork(nn.Module):
             else:
                 # (c). Standard codec.
                 x_hat_numpy, bpp = codec_ops.codec_fn(
-                    x_dot_numpy, codec=codec, quality=quality, downscale=downscale)
+                    x_dot_numpy, codec=codec, quality=quality, downscale=downscale, uv_zero=uv_zero)
                 if self.is_estimator:
                     x_hat = torch.as_tensor(x_hat_numpy, dtype=torch.float32, device=self.device)
                     x_hat = x_hat[None, ...]
